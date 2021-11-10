@@ -31,69 +31,81 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define GET_PSC(x, y) ((x)/(y))
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+TIM_HandleTypeDef htim4;
 
 /* USER CODE BEGIN PV */
-	uint8_t last_state = 1;
-	uint16_t speed = 100;
-	uint16_t LD_Pin[4] = {GPIO_PIN_12, GPIO_PIN_13, GPIO_PIN_14, GPIO_PIN_15};
-	enum States {
-		on_off,
-		state_1,
-		state_2,
-		state_3,
-		state_4
-	}state;
-
+static const uint16_t main_freq = 4000;// real apb1 freq/1000
+static uint8_t curr_freq = 10; //real timer freq/1000
+static uint16_t pulse[4] = {5000, 5000, 5000, 5000};
+static uint16_t psc;
+static enum States {
+	Off,
+	Green,
+	Orange,
+	Red,
+	Blue
+}state = 1;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_TIM4_Init(void);
 /* USER CODE BEGIN PFP */
 
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
+	  switch (GPIO_Pin) {
+	  	  case GPIO_PIN_11:
+	  		  if (curr_freq == 251) {
+	  			curr_freq = 1;
+	  			break;
+	  		  }
+	  		  curr_freq += 5;
+	  		  break;
+	  	  case GPIO_PIN_9:
+	  		  if (curr_freq == 1) {
+	  			curr_freq = 251;
+	  			break;
+	  		  }
+	  		  curr_freq -= 5;
+	  		  break;
+	  	  case GPIO_PIN_6:
+	  		  if (pulse[state-1] == 10000) {
+	  			pulse[state-1] = 0;
+	  			break;
+	  		  }
+	  		  pulse[state-1] += 500;
+	  		  break;
+	  	  case GPIO_PIN_8:
+	  		  if (pulse[state-1] == 0) {
+	  			pulse[state-1] = 10000;
+	  			break;
+	  		  }
+	  		  pulse[state-1] -= 500;
+	  		break;
+	  	  case GPIO_PIN_15:
+	  		  if (state == 4) {
+	  			  state = 0;
+	  			  break;
+	  		  }
+	  		  ++state;
+	  		  break;
+	  }
+	  psc = GET_PSC(main_freq, curr_freq) - 1;
+  }
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
-	  switch (GPIO_Pin) {
-	  	  case GPIO_PIN_11:
-	  		  if (state == 0) break;
-	  		  if (state == 4) state = 0;
-	  		  state += 1;
-	  		  break;
-	  	  case GPIO_PIN_9:
-	  		  if (state == 0) break;
-	  		  if (state == 1) state = 5;
-	  		  state -= 1;
-	  		  break;
-	  	  case GPIO_PIN_8:
-	  		  if (state == 0) break;
-	  		  speed += 20;
-	  		  break;
-	  	  case GPIO_PIN_6:
-	  		  if (state == 0) break;
-	  		  if (speed > 20)
-	  		  speed -= 20;
-	  		  break;
-	  	  case GPIO_PIN_15:
-	  		  if (state == 0) {
-	  			  state = last_state;
-	  			  break;
-	  		  }
-	  		  last_state = state;
-	  		  state = 0;
-	  		  break;
-	  }
-  }
+
 /* USER CODE END 0 */
 
 /**
@@ -112,7 +124,6 @@ int main(void)
   HAL_Init();
 
   /* USER CODE BEGIN Init */
-
   /* USER CODE END Init */
 
   /* Configure the system clock */
@@ -124,52 +135,41 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_TIM4_Init();
   /* USER CODE BEGIN 2 */
 
+  psc = GET_PSC(main_freq, curr_freq) - 1;
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	  TIM4->PSC = psc;
+	  TIM4->CCR1 = pulse[0];
+	  TIM4->CCR2 = pulse[1];
+	  TIM4->CCR3 = pulse[2];
+	  TIM4->CCR4 = pulse[3];
 	  switch (state) {
-	  	  case 1:
-	  		  for (uint8_t i = 0; i < 4; i++) {
-	  			  HAL_GPIO_WritePin(GPIOD, LD_Pin[i], GPIO_PIN_SET);
-	  			  HAL_Delay(speed);
-	  			  HAL_GPIO_WritePin(GPIOD, LD_Pin[i], GPIO_PIN_RESET);
-	  			  HAL_Delay(speed);
-	  		  }
-	  		  break;
-	  	  case 2:
-	  		  for (int8_t i = 3; i >= 0; i--) {
-	  			  HAL_GPIO_WritePin(GPIOD, LD_Pin[i], GPIO_PIN_SET);
-	  			  HAL_Delay(speed);
-	  			  HAL_GPIO_WritePin(GPIOD, LD_Pin[i], GPIO_PIN_RESET);
-	  			  HAL_Delay(speed);
-	  		  }
-	  		  break;
-	  	  case 3:
-	  		  	  HAL_GPIO_WritePin(GPIOD, LD_Pin[0] | LD_Pin[1] | LD_Pin[2] | LD_Pin[3], GPIO_PIN_SET);
-	  			  HAL_Delay(speed);
-	  			  HAL_GPIO_WritePin(GPIOD, LD_Pin[0] | LD_Pin[1] | LD_Pin[2] | LD_Pin[3], GPIO_PIN_RESET);
-	  			  HAL_Delay(speed);
-	  		  break;
-	  	  case 4:
-	  		  for (uint8_t i = 0; i < 2; i++) {
-	  			  HAL_GPIO_WritePin(GPIOD, LD_Pin[i], GPIO_PIN_SET);
-	  			  HAL_Delay(speed);
-	  			  HAL_GPIO_WritePin(GPIOD, LD_Pin[i], GPIO_PIN_RESET);
-	  			  HAL_Delay(speed);
-	  			  HAL_GPIO_WritePin(GPIOD, LD_Pin[i+2], GPIO_PIN_SET);
-	  			  HAL_Delay(speed);
-	  			  HAL_GPIO_WritePin(GPIOD, LD_Pin[i+2], GPIO_PIN_RESET);
-	  			  HAL_Delay(speed);
-	  		  }
-	  		  break;
-	  	  case 0:
-	  		  	  HAL_GPIO_WritePin(GPIOD, LD_Pin[0] | LD_Pin[1] | LD_Pin[2] | LD_Pin[3], GPIO_PIN_RESET);
-	  }
+	  	  	  case Green:
+	  	  		  HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1);
+	  	  		  break;
+	  	  	  case Orange:
+	  	  		  HAL_TIM_PWM_Stop(&htim4, TIM_CHANNEL_1);
+	  	  		  HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_2);
+	  	  		  break;
+	  	  	  case Red:
+	  	  		  HAL_TIM_PWM_Stop(&htim4, TIM_CHANNEL_2);
+	  	  		  HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_3);
+	  	  		  break;
+	  	  	  case Blue:
+	  	  		  HAL_TIM_PWM_Stop(&htim4, TIM_CHANNEL_3);
+	  	  		  HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_4);
+	  	  		  break;
+	  	  	  case Off:
+	  	  		  HAL_TIM_PWM_Stop(&htim4, TIM_CHANNEL_4);
+	  	  		  break;
+	  	  }
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -193,9 +193,8 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
-  RCC_OscInitStruct.HSIState = RCC_HSI_ON;
-  RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.HSEState = RCC_HSE_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
@@ -205,15 +204,80 @@ void SystemClock_Config(void)
   */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
-  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSI;
-  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSE;
+  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV2;
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
-  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
+  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;
 
   if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
   {
     Error_Handler();
   }
+  /** Enables the Clock Security System
+  */
+  HAL_RCC_EnableCSS();
+}
+
+/**
+  * @brief TIM4 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM4_Init(void)
+{
+
+  /* USER CODE BEGIN TIM4_Init 0 */
+
+  /* USER CODE END TIM4_Init 0 */
+
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_OC_InitTypeDef sConfigOC = {0};
+
+  /* USER CODE BEGIN TIM4_Init 1 */
+
+  /* USER CODE END TIM4_Init 1 */
+  htim4.Instance = TIM4;
+  htim4.Init.Prescaler = 399;
+  htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim4.Init.Period = 9999;
+  htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
+  if (HAL_TIM_PWM_Init(&htim4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim4, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = 5000;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  if (HAL_TIM_PWM_ConfigChannel(&htim4, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_ConfigChannel(&htim4, &sConfigOC, TIM_CHANNEL_2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigOC.Pulse = 500;
+  if (HAL_TIM_PWM_ConfigChannel(&htim4, &sConfigOC, TIM_CHANNEL_3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_ConfigChannel(&htim4, &sConfigOC, TIM_CHANNEL_4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM4_Init 2 */
+
+  /* USER CODE END TIM4_Init 2 */
+  HAL_TIM_MspPostInit(&htim4);
+
 }
 
 /**
@@ -226,19 +290,10 @@ static void MX_GPIO_Init(void)
   GPIO_InitTypeDef GPIO_InitStruct = {0};
 
   /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOH_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
   __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
-
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12|GPIO_PIN_13|GPIO_PIN_14|GPIO_PIN_15, GPIO_PIN_RESET);
-
-  /*Configure GPIO pins : PD12 PD13 PD14 PD15 */
-  GPIO_InitStruct.Pin = GPIO_PIN_12|GPIO_PIN_13|GPIO_PIN_14|GPIO_PIN_15;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
 
   /*Configure GPIO pins : PC6 PC8 PC9 PC11 */
   GPIO_InitStruct.Pin = GPIO_PIN_6|GPIO_PIN_8|GPIO_PIN_9|GPIO_PIN_11;

@@ -64,9 +64,8 @@ static void MX_GPIO_Init(void);
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-	uint16_t pin = GPIO_PIN_12;
-	uint16_t counter = 8;
-	uint16_t last_adr = GPIO_PIN_15;
+	uint16_t pin[4] = {GPIO_PIN_12, GPIO_PIN_13, GPIO_PIN_14, GPIO_PIN_15};
+
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -95,45 +94,31 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  do{
-	  	  HAL_GPIO_WritePin(GPIOD, pin, GPIO_PIN_SET);
-	  	  HAL_Delay(150);
+	  for (int8_t i = 3; i >= 0; i--) {
+		  for (int8_t j = 0; j < i; j++) {
+			  HAL_GPIO_WritePin(GPIOD, pin[j], GPIO_PIN_SET);
+			  HAL_Delay(150);
+			  HAL_GPIO_WritePin(GPIOD, pin[j], GPIO_PIN_RESET);
+			  HAL_Delay(150);
+		  }
+		  HAL_GPIO_WritePin(GPIOD, pin[i], GPIO_PIN_SET);
+		  HAL_Delay(150);
 
-	  	  if(pin == last_adr){
-	  		last_adr /= 2;
-	  		pin = 0x1000;
-	  	  }
-	  	  else {
-	  		HAL_GPIO_WritePin(GPIOD, pin, GPIO_PIN_RESET);
-	  	    HAL_Delay(150);
-	  		pin *= 2;
-	  	  }
-	  }while(last_adr >= GPIO_PIN_12);
+	  }
+	  for (int8_t i = 3; i >= 0; i--) {
+		  for (int8_t j = 0; j < i; j++) {
+			  HAL_GPIO_WritePin(GPIOD, pin[j], GPIO_PIN_RESET);
+			  HAL_Delay(150);
+			  HAL_GPIO_WritePin(GPIOD, pin[j], GPIO_PIN_SET);
+			  HAL_Delay(150);
+		  }
+		  HAL_GPIO_WritePin(GPIOD, pin[i], GPIO_PIN_RESET);
+		  HAL_Delay(150);
 
-	  last_adr = GPIO_PIN_15;
-	  pin = GPIO_PIN_12;
-
-	  do{
-	  	  HAL_GPIO_WritePin(GPIOD, pin, GPIO_PIN_RESET);
-	  	  HAL_Delay(150);
-
-	  	  if(pin == last_adr){
-	  	    last_adr /= 2;
-	  	  	pin = 0x1000;
-	  	  }
-	  	  else {
-	  	  	HAL_GPIO_WritePin(GPIOD, pin, GPIO_PIN_SET);
-	  	  	HAL_Delay(150);
-	  	    pin *= 2;
-	  	  }
-	  }while(last_adr >= GPIO_PIN_12);
-
-	  last_adr = GPIO_PIN_15;
-	  pin = GPIO_PIN_12;
-
+	  }
 
     /* USER CODE END WHILE */
-  	 }
+  }
     /* USER CODE BEGIN 3 */
 
   /* USER CODE END 3 */
