@@ -104,14 +104,17 @@ int main(void)
   /* USER CODE BEGIN 2 */
 	HAL_StatusTypeDef status;
 	uint8_t buff[0];
-	HAL_ADC_Start_IT(&hadc1);
+	HAL_ADC_Start(&hadc1);
 	HAL_TIM_OC_Start(&htim4, TIM_CHANNEL_4);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+	uint16_t volt, temperature;
+	uint8_t deg[3];
 	while (1) {
-		status = HAL_UART_Receive(&huart3, buff, 1, 10);
+
+		status = HAL_UART_Receive(&huart3, buff, 1, 5);
 		if (status == HAL_OK) {
 			switch (buff[0]) {
 			case '1':
@@ -126,7 +129,21 @@ int main(void)
 			case '4':
 				OnOffLed(color[Blue], GPIO_PIN_15);
 				break;
+			case '0':
+				HAL_ADC_Start(&hadc1);
+				HAL_ADC_PollForConversion(&hadc1, 10);
+				volt = HAL_ADC_GetValue(&hadc1);
+				temperature = (2 / 3.3 * (4095 - volt)) * 0.02; //0 - 100 deg
+				itoa(temperature, deg, 10);
+				HAL_UART_Transmit(&huart3, (uint8_t*) "Temperature:  ", 15, 10);
+				HAL_UART_Transmit(&huart3, deg, sizeof(deg), 10);
+				HAL_UART_Transmit(&huart3, (uint8_t*) "\r\n", 2, 10);
+
+				break;
+			default:
+				break;
 			}
+			HAL_Delay(100);
 		}
     /* USER CODE END WHILE */
 
@@ -298,7 +315,7 @@ static void MX_USART3_UART_Init(void)
 
   /* USER CODE END USART3_Init 1 */
   huart3.Instance = USART3;
-  huart3.Init.BaudRate = 115200;
+  huart3.Init.BaudRate = 9600;
   huart3.Init.WordLength = UART_WORDLENGTH_8B;
   huart3.Init.StopBits = UART_STOPBITS_1;
   huart3.Init.Parity = UART_PARITY_NONE;
@@ -390,16 +407,16 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 	}
 }
 
-void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc) {
+/*void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc) {
 	uint16_t volt, temperature;
-	uint8_t *deg[] = { "" };
+	uint8_t* deg[] = { "" };
 	volt = HAL_ADC_GetValue(hadc);
 	temperature = (2 / 3.3 * 4095 - 2 / 3.3 * volt) * 0.02; //0 - 100 deg
 	itoa(temperature, deg, 10);
 
 	HAL_UART_Transmit(&huart3, deg, sizeof(deg), 10);
 	HAL_UART_Transmit(&huart3, (uint8_t*) "\r\n", 2, 10);
-}
+}*/
 
 /* USER CODE END 4 */
 
