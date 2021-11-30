@@ -1,21 +1,21 @@
 /* USER CODE BEGIN Header */
 /**
- ******************************************************************************
- * @file           : main.c
- * @brief          : Main program body
- ******************************************************************************
- * @attention
- *
- * <h2><center>&copy; Copyright (c) 2021 STMicroelectronics.
- * All rights reserved.</center></h2>
- *
- * This software component is licensed by ST under BSD 3-Clause license,
- * the "License"; You may not use this file except in compliance with the
- * License. You may obtain a copy of the License at:
- *                        opensource.org/licenses/BSD-3-Clause
- *
- ******************************************************************************
- */
+  ******************************************************************************
+  * @file           : main.c
+  * @brief          : Main program body
+  ******************************************************************************
+  * @attention
+  *
+  * <h2><center>&copy; Copyright (c) 2021 STMicroelectronics.
+  * All rights reserved.</center></h2>
+  *
+  * This software component is licensed by ST under BSD 3-Clause license,
+  * the "License"; You may not use this file except in compliance with the
+  * License. You may obtain a copy of the License at:
+  *                        opensource.org/licenses/BSD-3-Clause
+  *
+  ******************************************************************************
+  */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
@@ -24,46 +24,51 @@
 /* USER CODE BEGIN Includes */
 #include <string.h>
 #include <stdio.h>
+#include "SPI_func.h"
+//#include "SPI_var.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
+
 /* USER CODE END PTD */
-
-/* Private define ------------------------------------------------------------*/
-/* USER CODE BEGIN PD */
-#define START_PWM 50	// Start PWM in %
-#define MAX_PWM 100	// Max PWM in %
-#define MIN_PWM 0	    // Min PWM in %
-#define START_FREQ 200	// Start frequency in KHz
-#define MAX_FREQ 1500	// Max frequency in KHz
-#define MIN_FREQ 0		// Min frequency in KHz
-
-enum
-{
-	SIGNAL_ON,
-	SIGNAL_OFF
-};
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
+SPI_HandleTypeDef hspi1;
+UART_HandleTypeDef huart3;
 
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
-I2C_HandleTypeDef hi2c1;
-
-UART_HandleTypeDef huart3;
-
 /* USER CODE BEGIN PV */
-
+#define STR_NUM	 16    		  // Time capsule amount of strings
+#define STR_LEN	 100		  // Time capsule string length
+uint8_t TimeCapsule[STR_NUM][STR_LEN] = {
+		  "From: Dmitry Pustovalov, dmitrypustovalov2000@gmail.com\r\n",
+		  "Mentor: Vladyslav Kotsiurba, vladyslav.kotsiurba@globallogic.com\r\n",
+		  "Date: 29.11.2021\r\n",
+		  "TIME CAPSULE\r\n",
+		  "Read books but choose it wisely\r\n",
+		  "Look for love in yourself then in others\r\n",
+		  "Happiness is in your head, not in the end of path\r\n",
+		  "The shortcut either leads to the wrong place or makes you pay twice\r\n",
+		  "Goals are set only for the sake of the road to them, but not for their own sake\r\n",
+		  "Don't be afraid of the way the time goes, love it\r\n",
+		  "Gruppa Skryptonite - Latinskaya Muzyka\r\n",
+		  "Jack London - Martin Eden\r\n",
+		  "Martin Scorsese - Shutter Island\r\n",
+		  "Audi A7\r\n",
+		  "In rock we trust, it's rock or bust\r\n",
+		  "Live long, die fast\r\n",
+  };
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-static void MX_I2C1_Init(void);
+static void MX_SPI1_Init(void);
 static void MX_USART3_UART_Init(void);
 /* USER CODE BEGIN PFP */
 
@@ -102,88 +107,44 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_I2C1_Init();
+  MX_SPI1_Init();
   MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
-	HAL_Delay(100);
-
+  HAL_Delay(100);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-
-	HAL_StatusTypeDef status;
-	uint8_t RecieveValueue;
-	uint16_t CurrentDutyCycle = START_PWM;
-	uint16_t CurrentFrequency = START_FREQ;
-	int8_t SignalStatus = SIGNAL_ON;    //Current signal status
-	uint8_t InfoBuff[] = {"1 - Frequency +100\r\n2 - Frequency -100\r\n3 - Duty Cycle +10%\r\n4 - Duty Cycle -10%\r\n0 - Signal On/Off\r\n"};
-	HAL_UART_Transmit(&huart3, InfoBuff , sizeof(InfoBuff), 110);
-	while (1) {
-		status = HAL_UART_Receive(&huart3, &RecieveValueue, 1, 10);
-		if (status == HAL_OK) {
-			switch (RecieveValueue) {
-				case '1':
-					if (CurrentFrequency < MAX_FREQ)
-					{
-						CurrentFrequency += 100;
-						setFreq(CurrentFrequency);
-						HAL_UART_Transmit(&huart3, (uint8_t*) "Frequency increased by 100\r\n", 28, 100);
-					}
-					else
-						HAL_UART_Transmit(&huart3, (uint8_t*) "Frequency can not be increased\r\n", 32, 100);
-					break;
-				case '2':
-					if (CurrentFrequency > MIN_FREQ)
-					{
-						CurrentFrequency -= 100;
-						setFreq(CurrentFrequency);
-						HAL_UART_Transmit(&huart3, (uint8_t*) "Frequency decreased by 100\r\n", 28, 100);
-					}
-					else
-						HAL_UART_Transmit(&huart3, (uint8_t*) "Frequency can not be decreased\r\n", 32, 100);
-					break;
-				case '3':
-					if (CurrentDutyCycle < 100)
-					{
-						CurrentDutyCycle += 10;
-						setDuty(CurrentDutyCycle);
-						HAL_UART_Transmit(&huart3, (uint8_t*) "Duty increased by 10%\r\n", 23, 100);
-					}
-					else
-						HAL_UART_Transmit(&huart3, (uint8_t*) "Duty can not be increased\r\n", 27, 100);
-					break;
-				case '4':
-					if (CurrentDutyCycle > 0)
-					{
-						CurrentDutyCycle -= 10;
-						setDuty(CurrentDutyCycle);
-						HAL_UART_Transmit(&huart3, (uint8_t*) "Duty decreased by 10%\r\n", 23, 100);
-					}
-					else
-						HAL_UART_Transmit(&huart3, (uint8_t*) "Duty can not be decreased\r\n", 27, 100);
-					break;
-				case '0':
-					if (SignalStatus == SIGNAL_ON) {
-						SignalStatus = SIGNAL_OFF;
-						turnOff();
-						HAL_UART_Transmit(&huart3, (uint8_t*) "Signal off\r\n", 12, 100);
-					}
-					else
-					{
-						SignalStatus = SIGNAL_ON;
-						setDuty(CurrentDutyCycle);
-						HAL_UART_Transmit(&huart3, (uint8_t*) "Signal on\r\n", 11, 100);
-					}
-					break;
-				default:
-					break;
-			}
-		}
+  HAL_StatusTypeDef status ;
+  uint16_t val;
+  ShowInfo();
+  while (val != 'q') {
+	  status = HAL_UART_Receive(&huart3, &val, 1, 10);
+	  		if (status == HAL_OK) {
+	  		switch (val) {
+	  			case '1':
+	  				ChipErase();
+	  				HAL_UART_Transmit(&huart3, (uint8_t*) "Entire memory was erased\r\n\n", 27, 50);
+	  				break;
+	  			case '2':
+	  				ChipErase();
+	  			  	WriteTimeCapsule(TimeCapsule);
+	  			  	HAL_UART_Transmit(&huart3, (uint8_t*) "The time capsule was recorded\r\n\n",32, 50);
+	  				break;
+	  			case '3':
+	  				HAL_UART_Transmit(&huart3, (uint8_t*) "The time capsule:\r\n",19, 50);
+	  				ReadTimeCapsule();
+	  				HAL_UART_Transmit(&huart3, (uint8_t*) "\r\n",2, 50);
+	  				break;
+	  			default:
+	  				break;
+	  			}
+	  		}
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	}
+  }
+  HAL_UART_Transmit(&huart3, (uint8_t*) "Exit\r\n", 6, 50);
   /* USER CODE END 3 */
 }
 
@@ -227,36 +188,40 @@ void SystemClock_Config(void)
 }
 
 /**
-  * @brief I2C1 Initialization Function
+  * @brief SPI1 Initialization Function
   * @param None
   * @retval None
   */
-static void MX_I2C1_Init(void)
+static void MX_SPI1_Init(void)
 {
 
-  /* USER CODE BEGIN I2C1_Init 0 */
+  /* USER CODE BEGIN SPI1_Init 0 */
 
-  /* USER CODE END I2C1_Init 0 */
+  /* USER CODE END SPI1_Init 0 */
 
-  /* USER CODE BEGIN I2C1_Init 1 */
+  /* USER CODE BEGIN SPI1_Init 1 */
 
-  /* USER CODE END I2C1_Init 1 */
-  hi2c1.Instance = I2C1;
-  hi2c1.Init.ClockSpeed = 50000;
-  hi2c1.Init.DutyCycle = I2C_DUTYCYCLE_2;
-  hi2c1.Init.OwnAddress1 = 0;
-  hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
-  hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
-  hi2c1.Init.OwnAddress2 = 0;
-  hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
-  hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
-  if (HAL_I2C_Init(&hi2c1) != HAL_OK)
+  /* USER CODE END SPI1_Init 1 */
+  /* SPI1 parameter configuration*/
+  hspi1.Instance = SPI1;
+  hspi1.Init.Mode = SPI_MODE_MASTER;
+  hspi1.Init.Direction = SPI_DIRECTION_2LINES;
+  hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
+  hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
+  hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
+  hspi1.Init.NSS = SPI_NSS_SOFT;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_32;
+  hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
+  hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
+  hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+  hspi1.Init.CRCPolynomial = 10;
+  if (HAL_SPI_Init(&hspi1) != HAL_OK)
   {
     Error_Handler();
   }
-  /* USER CODE BEGIN I2C1_Init 2 */
+  /* USER CODE BEGIN SPI1_Init 2 */
 
-  /* USER CODE END I2C1_Init 2 */
+  /* USER CODE END SPI1_Init 2 */
 
 }
 
@@ -303,28 +268,19 @@ static void MX_GPIO_Init(void)
   GPIO_InitTypeDef GPIO_InitStruct = {0};
 
   /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12|GPIO_PIN_13|GPIO_PIN_14|GPIO_PIN_15, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_7, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_RESET);
-
-  /*Configure GPIO pins : PD12 PD13 PD14 PD15 */
-  GPIO_InitStruct.Pin = GPIO_PIN_12|GPIO_PIN_13|GPIO_PIN_14|GPIO_PIN_15;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : PB7 */
+  /*Configure GPIO pin : PD7 */
   GPIO_InitStruct.Pin = GPIO_PIN_7;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
 
 }
 
@@ -339,10 +295,11 @@ static void MX_GPIO_Init(void)
 void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
-	/* User can add his own implementation to report the HAL error return state */
-	__disable_irq();
-	while (1) {
-	}
+  /* User can add his own implementation to report the HAL error return state */
+  __disable_irq();
+  while (1)
+  {
+  }
   /* USER CODE END Error_Handler_Debug */
 }
 
@@ -358,7 +315,7 @@ void assert_failed(uint8_t *file, uint32_t line)
 {
   /* USER CODE BEGIN 6 */
   /* User can add his own implementation to report the file name and line number,
-     ex: printf("Wrong parameters RecieveValueueue: file %s on line %d\r\n", file, line) */
+     ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
   /* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */
